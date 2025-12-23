@@ -14,11 +14,8 @@
         <div id="start-screen" class="screen">
             <p class="subtitle">Can you tell them apart?</p>
 
-            <div class="category-section">
-                <label for="preset-select">Choose a category pair:</label>
-                <select id="preset-select">
-                    <option value="">-- Select preset --</option>
-                </select>
+            <div class="preset-buttons" id="preset-buttons">
+                <!-- Populated by JS -->
             </div>
 
             <div class="divider">or create your own</div>
@@ -26,9 +23,8 @@
             <div class="custom-category">
                 <input type="text" id="category1" placeholder="Category 1 (e.g., 1950s Buicks)">
                 <input type="text" id="category2" placeholder="Category 2 (e.g., 1980s Buicks)">
+                <button id="start-btn" class="btn btn-primary">Start Custom Quiz</button>
             </div>
-
-            <button id="start-btn" class="btn btn-primary">Start Quiz</button>
         </div>
 
         <!-- Game Screen -->
@@ -63,6 +59,7 @@
             <div class="overlay-content">
                 <div class="overlay-icon" id="overlay-icon"></div>
                 <div class="overlay-text" id="overlay-text"></div>
+                <div class="overlay-details" id="overlay-details"></div>
             </div>
         </div>
 

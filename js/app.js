@@ -12,6 +12,8 @@ const Game = {
     imagesForCategory1: [],
     imagesForCategory2: [],
     usedImages: new Set(),
+    currentImg1: null,  // Current round's category1 image
+    currentImg2: null,  // Current round's category2 image
 
     // DOM Elements
     elements: {},
@@ -30,7 +32,7 @@ const Game = {
             gameScreen: document.getElementById('game-screen'),
             loadingScreen: document.getElementById('loading-screen'),
             resultScreen: document.getElementById('result-screen'),
-            presetSelect: document.getElementById('preset-select'),
+            presetButtons: document.getElementById('preset-buttons'),
             category1Input: document.getElementById('category1'),
             category2Input: document.getElementById('category2'),
             startBtn: document.getElementById('start-btn'),
@@ -45,19 +47,22 @@ const Game = {
             overlay: document.getElementById('overlay'),
             overlayIcon: document.getElementById('overlay-icon'),
             overlayText: document.getElementById('overlay-text'),
+            overlayDetails: document.getElementById('overlay-details'),
             finalScoreValue: document.getElementById('final-score-value'),
             resultMessage: document.getElementById('result-message')
         };
     },
 
-    // Populate preset dropdown
+    // Populate preset buttons
     populatePresets() {
         const presets = Categories.getPresetNames();
         presets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset.index;
-            option.textContent = preset.name;
-            this.elements.presetSelect.appendChild(option);
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.dataset.index = preset.index;
+            btn.textContent = preset.name;
+            btn.addEventListener('click', () => this.startWithPreset(preset.index));
+            this.elements.presetButtons.appendChild(btn);
         });
     },
 
@@ -70,21 +75,16 @@ const Game = {
         this.elements.imageCards.forEach(card => {
             card.addEventListener('click', (e) => this.handleImageClick(e));
         });
+    },
 
-        // Clear custom inputs when preset selected
-        this.elements.presetSelect.addEventListener('change', () => {
-            if (this.elements.presetSelect.value !== '') {
-                this.elements.category1Input.value = '';
-                this.elements.category2Input.value = '';
-            }
-        });
-
-        // Clear preset when custom inputs used
-        [this.elements.category1Input, this.elements.category2Input].forEach(input => {
-            input.addEventListener('input', () => {
-                this.elements.presetSelect.value = '';
-            });
-        });
+    // Start game with a preset
+    startWithPreset(presetIndex) {
+        const preset = Categories.getPreset(parseInt(presetIndex));
+        this.category1 = preset.category1;
+        this.category2 = preset.category2;
+        this.label1 = Categories.formatLabel(preset.category1);
+        this.label2 = Categories.formatLabel(preset.category2);
+        this.loadAndStartGame();
     },
 
     // Show a specific screen
@@ -95,29 +95,25 @@ const Game = {
         this.elements[screenName].classList.remove('hidden');
     },
 
-    // Start the game
-    async startGame() {
-        // Get categories
-        const presetIndex = this.elements.presetSelect.value;
+    // Start game with custom categories
+    startGame() {
         const customCat1 = this.elements.category1Input.value.trim();
         const customCat2 = this.elements.category2Input.value.trim();
 
-        if (presetIndex !== '') {
-            const preset = Categories.getPreset(parseInt(presetIndex));
-            this.category1 = preset.category1;
-            this.category2 = preset.category2;
-            this.label1 = Categories.formatLabel(preset.category1);
-            this.label2 = Categories.formatLabel(preset.category2);
-        } else if (customCat1 && customCat2) {
-            this.category1 = customCat1;
-            this.category2 = customCat2;
-            this.label1 = customCat1;
-            this.label2 = customCat2;
-        } else {
-            alert('Please select a category pair or enter custom categories.');
+        if (!customCat1 || !customCat2) {
+            alert('Please enter both categories.');
             return;
         }
 
+        this.category1 = customCat1;
+        this.category2 = customCat2;
+        this.label1 = customCat1;
+        this.label2 = customCat2;
+        this.loadAndStartGame();
+    },
+
+    // Load images and start the game
+    async loadAndStartGame() {
         // Reset state
         this.currentRound = 0;
         this.score = 0;
@@ -177,20 +173,20 @@ const Game = {
             card.classList.remove('correct', 'incorrect', 'disabled');
         });
 
-        // Get images
-        const img1 = this.getUnusedImage(this.imagesForCategory1);
-        const img2 = this.getUnusedImage(this.imagesForCategory2);
+        // Get images and store them for the overlay
+        this.currentImg1 = this.getUnusedImage(this.imagesForCategory1);
+        this.currentImg2 = this.getUnusedImage(this.imagesForCategory2);
 
         // Randomly decide which goes where (0 = left, 1 = right)
         this.correctIndex = Math.random() < 0.5 ? 0 : 1;
 
         // Set images (no labels shown - that would give away the answer!)
         if (this.correctIndex === 0) {
-            this.setImage(0, img1.url);
-            this.setImage(1, img2.url);
+            this.setImage(0, this.currentImg1.url);
+            this.setImage(1, this.currentImg2.url);
         } else {
-            this.setImage(0, img2.url);
-            this.setImage(1, img1.url);
+            this.setImage(0, this.currentImg2.url);
+            this.setImage(1, this.currentImg1.url);
         }
 
         // Set the question (always ask for category 1)
@@ -238,7 +234,18 @@ const Game = {
             } else {
                 this.nextRound();
             }
-        }, 1200);
+        }, 1800);
+    },
+
+    // Format Wikimedia title for display
+    formatImageTitle(title) {
+        if (!title) return 'Unknown';
+        // Remove "File:" prefix and file extension
+        return title
+            .replace(/^File:/, '')
+            .replace(/\.[^.]+$/, '')
+            .replace(/_/g, ' ')
+            .substring(0, 50) + (title.length > 50 ? '...' : '');
     },
 
     // Show full-screen overlay
@@ -246,6 +253,23 @@ const Game = {
         this.elements.overlay.className = `overlay ${isCorrect ? 'correct' : 'incorrect'}`;
         this.elements.overlayIcon.textContent = isCorrect ? '✓' : '✗';
         this.elements.overlayText.textContent = message;
+
+        // Show image details
+        const title1 = this.formatImageTitle(this.currentImg1?.title);
+        const title2 = this.formatImageTitle(this.currentImg2?.title);
+        this.elements.overlayDetails.innerHTML = `
+            <div class="image-info">
+                <div>
+                    <strong>${this.label1}</strong>
+                    <span>${title1}</span>
+                </div>
+                <div>
+                    <strong>${this.label2}</strong>
+                    <span>${title2}</span>
+                </div>
+            </div>
+        `;
+
         this.elements.overlay.classList.remove('hidden');
     },
 
