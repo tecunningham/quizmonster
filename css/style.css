@@ -17,6 +17,11 @@ body {
     padding: 20px;
 }
 
+.title-link {
+    text-decoration: none;
+    display: block;
+}
+
 .title {
     text-align: center;
     font-size: 2.5rem;
@@ -25,6 +30,11 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    transition: opacity 0.2s;
+}
+
+.title-link:hover .title {
+    opacity: 0.8;
 }
 
 .subtitle {

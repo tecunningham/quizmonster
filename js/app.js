@@ -14,6 +14,7 @@ const Game = {
     usedImages: new Set(),
     currentImg1: null,  // Current round's category1 image
     currentImg2: null,  // Current round's category2 image
+    currentPresetSlug: null,  // Track if using a preset for share URL
 
     // DOM Elements
     elements: {},
@@ -33,11 +34,10 @@ const Game = {
         const cat1 = params.get('cat1');
         const cat2 = params.get('cat2');
 
-        if (preset !== null) {
-            const presetIndex = parseInt(preset);
-            const presetData = Categories.getPreset(presetIndex);
+        if (preset) {
+            const presetData = Categories.getPreset(preset);
             if (presetData) {
-                this.startWithPreset(presetIndex);
+                this.startWithPreset(preset);
             }
         } else if (cat1 && cat2) {
             this.category1 = cat1;
@@ -51,7 +51,9 @@ const Game = {
     // Generate shareable URL for current game
     getShareUrl() {
         const base = window.location.origin + window.location.pathname;
-        if (this.category1 && this.category2) {
+        if (this.currentPresetSlug) {
+            return `${base}?preset=${this.currentPresetSlug}`;
+        } else if (this.category1 && this.category2) {
             return `${base}?cat1=${encodeURIComponent(this.category1)}&cat2=${encodeURIComponent(this.category2)}`;
         }
         return base;
@@ -70,7 +72,6 @@ const Game = {
             startBtn: document.getElementById('start-btn'),
             playAgainBtn: document.getElementById('play-again-btn'),
             shareBtn: document.getElementById('share-btn'),
-            restartBtn: document.getElementById('restart-btn'),
             roundCounter: document.getElementById('round-counter'),
             scoreDisplay: document.getElementById('score-display'),
             targetLabel: document.getElementById('target-label'),
@@ -95,9 +96,9 @@ const Game = {
         presets.forEach(preset => {
             const btn = document.createElement('button');
             btn.className = 'preset-btn';
-            btn.dataset.index = preset.index;
+            btn.dataset.slug = preset.slug;
             btn.textContent = preset.name;
-            btn.addEventListener('click', () => this.startWithPreset(preset.index));
+            btn.addEventListener('click', () => this.startWithPreset(preset.slug));
             this.elements.presetButtons.appendChild(btn);
         });
     },
@@ -107,7 +108,6 @@ const Game = {
         this.elements.startBtn.addEventListener('click', () => this.startGame());
         this.elements.playAgainBtn.addEventListener('click', () => this.resetGame());
         this.elements.shareBtn.addEventListener('click', () => this.shareQuiz());
-        this.elements.restartBtn.addEventListener('click', () => this.resetGame());
 
         this.elements.imageCards.forEach(card => {
             card.addEventListener('click', (e) => this.handleImageClick(e));
@@ -129,9 +129,11 @@ const Game = {
         }
     },
 
-    // Start game with a preset
-    startWithPreset(presetIndex) {
-        const preset = Categories.getPreset(parseInt(presetIndex));
+    // Start game with a preset (by slug)
+    startWithPreset(slug) {
+        const preset = Categories.getPreset(slug);
+        if (!preset) return;
+        this.currentPresetSlug = slug;
         this.category1 = preset.category1;
         this.category2 = preset.category2;
         this.label1 = Categories.formatLabel(preset.category1);
@@ -157,6 +159,7 @@ const Game = {
             return;
         }
 
+        this.currentPresetSlug = null;  // Custom game, not a preset
         this.category1 = customCat1;
         this.category2 = customCat2;
         this.label1 = customCat1;
