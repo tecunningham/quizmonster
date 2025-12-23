@@ -32,10 +32,12 @@ const Wikimedia = {
                     if (!info) return false;
                     // Filter for actual images (not SVG, PDF, etc.)
                     const mime = info.mime || '';
-                    return mime.startsWith('image/') &&
-                           !mime.includes('svg') &&
-                           info.width >= 200 &&
-                           info.height >= 200;
+                    if (!mime.startsWith('image/') || mime.includes('svg')) return false;
+                    if (info.width < 200 || info.height < 200) return false;
+                    // Filter out extreme aspect ratios (between 1:2.5 and 2.5:1)
+                    const aspectRatio = info.width / info.height;
+                    if (aspectRatio < 0.4 || aspectRatio > 2.5) return false;
+                    return true;
                 })
                 .map(page => ({
                     title: page.title,

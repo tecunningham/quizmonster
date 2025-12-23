@@ -43,6 +43,8 @@ const Game = {
             targetLabel: document.getElementById('target-label'),
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
+            meta0: document.getElementById('meta-0'),
+            meta1: document.getElementById('meta-1'),
             imageCards: document.querySelectorAll('.image-card'),
             overlay: document.getElementById('overlay'),
             overlayIcon: document.getElementById('overlay-icon'),
@@ -168,10 +170,12 @@ const Game = {
         this.elements.roundCounter.textContent = `Round ${this.currentRound} of ${this.totalRounds}`;
         this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
 
-        // Reset image cards
+        // Reset image cards and hide metadata
         this.elements.imageCards.forEach(card => {
             card.classList.remove('correct', 'incorrect', 'disabled');
         });
+        this.elements.meta0.classList.add('hidden');
+        this.elements.meta1.classList.add('hidden');
 
         // Get images and store them for the overlay
         this.currentImg1 = this.getUnusedImage(this.imagesForCategory1);
@@ -216,6 +220,9 @@ const Game = {
         // Check answer
         const isCorrect = clickedIndex === this.correctIndex;
 
+        // Show metadata on images
+        this.showImageMeta();
+
         if (isCorrect) {
             this.score++;
             card.classList.add('correct');
@@ -237,6 +244,26 @@ const Game = {
         }, 1800);
     },
 
+    // Show metadata overlay on images
+    showImageMeta() {
+        const title1 = this.formatImageTitle(this.currentImg1?.title);
+        const title2 = this.formatImageTitle(this.currentImg2?.title);
+
+        // Determine which image is in which position
+        if (this.correctIndex === 0) {
+            // img1 is on left (index 0), img2 is on right (index 1)
+            this.elements.meta0.innerHTML = `<div class="meta-label">${this.label1}</div><div class="meta-title">${title1}</div>`;
+            this.elements.meta1.innerHTML = `<div class="meta-label">${this.label2}</div><div class="meta-title">${title2}</div>`;
+        } else {
+            // img2 is on left (index 0), img1 is on right (index 1)
+            this.elements.meta0.innerHTML = `<div class="meta-label">${this.label2}</div><div class="meta-title">${title2}</div>`;
+            this.elements.meta1.innerHTML = `<div class="meta-label">${this.label1}</div><div class="meta-title">${title1}</div>`;
+        }
+
+        this.elements.meta0.classList.remove('hidden');
+        this.elements.meta1.classList.remove('hidden');
+    },
+
     // Format Wikimedia title for display
     formatImageTitle(title) {
         if (!title) return 'Unknown';
@@ -253,23 +280,7 @@ const Game = {
         this.elements.overlay.className = `overlay ${isCorrect ? 'correct' : 'incorrect'}`;
         this.elements.overlayIcon.textContent = isCorrect ? '✓' : '✗';
         this.elements.overlayText.textContent = message;
-
-        // Show image details
-        const title1 = this.formatImageTitle(this.currentImg1?.title);
-        const title2 = this.formatImageTitle(this.currentImg2?.title);
-        this.elements.overlayDetails.innerHTML = `
-            <div class="image-info">
-                <div>
-                    <strong>${this.label1}</strong>
-                    <span>${title1}</span>
-                </div>
-                <div>
-                    <strong>${this.label2}</strong>
-                    <span>${title2}</span>
-                </div>
-            </div>
-        `;
-
+        this.elements.overlayDetails.innerHTML = '';
         this.elements.overlay.classList.remove('hidden');
     },
 
