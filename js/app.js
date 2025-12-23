@@ -78,13 +78,14 @@ const Game = {
             otherLabel: document.getElementById('other-label'),
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
-            meta0: document.getElementById('meta-0'),
-            meta1: document.getElementById('meta-1'),
             imageCards: document.querySelectorAll('.image-card'),
-            overlay: document.getElementById('overlay'),
-            overlayIcon: document.getElementById('overlay-icon'),
-            overlayText: document.getElementById('overlay-text'),
-            overlayDetails: document.getElementById('overlay-details'),
+            previousRound: document.getElementById('previous-round'),
+            prevImage0: document.getElementById('prev-image-0'),
+            prevImage1: document.getElementById('prev-image-1'),
+            prevCard0: document.getElementById('prev-card-0'),
+            prevCard1: document.getElementById('prev-card-1'),
+            prevMeta0: document.getElementById('prev-meta-0'),
+            prevMeta1: document.getElementById('prev-meta-1'),
             finalScoreValue: document.getElementById('final-score-value'),
             resultMessage: document.getElementById('result-message')
         };
@@ -223,14 +224,17 @@ const Game = {
         this.elements.roundCounter.textContent = `Round ${this.currentRound} of ${this.totalRounds}`;
         this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
 
-        // Reset image cards and hide metadata
+        // Reset image cards
         this.elements.imageCards.forEach(card => {
             card.classList.remove('correct', 'incorrect', 'disabled');
         });
-        this.elements.meta0.classList.add('hidden');
-        this.elements.meta1.classList.add('hidden');
 
-        // Get images and store them for the overlay
+        // Hide previous round on first round
+        if (this.currentRound === 1) {
+            this.elements.previousRound.classList.add('hidden');
+        }
+
+        // Get images and store them
         this.currentImg1 = this.getUnusedImage(this.imagesForCategory1);
         this.currentImg2 = this.getUnusedImage(this.imagesForCategory2);
 
@@ -268,54 +272,76 @@ const Game = {
         const card = e.currentTarget;
         const clickedIndex = parseInt(card.dataset.index);
 
-        // Disable further clicks
-        this.elements.imageCards.forEach(c => c.classList.add('disabled'));
-
         // Check answer
         const isCorrect = clickedIndex === this.correctIndex;
 
-        // Show metadata on images
-        this.showImageMeta();
-
         if (isCorrect) {
             this.score++;
-            card.classList.add('correct');
-            this.showOverlay(true, 'Correct!');
-        } else {
-            card.classList.add('incorrect');
-            this.elements.imageCards[this.correctIndex].classList.add('correct');
-            this.showOverlay(false, `That was ${this.label2}`);
         }
 
-        // Next round or end game
-        setTimeout(() => {
-            this.hideOverlay();
-            if (this.currentRound >= this.totalRounds) {
-                this.endGame();
-            } else {
-                this.nextRound();
-            }
-        }, 1800);
+        // Show the previous round result
+        this.showPreviousRound(clickedIndex, isCorrect);
+
+        // Immediately go to next round or end game
+        if (this.currentRound >= this.totalRounds) {
+            this.endGame();
+        } else {
+            this.nextRound();
+        }
     },
 
-    // Show metadata overlay on images
-    showImageMeta() {
+    // Show previous round results below current images
+    showPreviousRound(clickedIndex, isCorrect) {
         const title1 = this.formatImageTitle(this.currentImg1?.title);
         const title2 = this.formatImageTitle(this.currentImg2?.title);
 
-        // Determine which image is in which position
+        // Set images
+        this.elements.prevImage0.src = this.elements.image0.src;
+        this.elements.prevImage1.src = this.elements.image1.src;
+
+        // Reset classes
+        this.elements.prevCard0.className = 'previous-card';
+        this.elements.prevCard1.className = 'previous-card';
+
+        // Determine which image is in which position and set metadata
+        let meta0Label, meta0Title, meta1Label, meta1Title;
         if (this.correctIndex === 0) {
-            // img1 is on left (index 0), img2 is on right (index 1)
-            this.elements.meta0.innerHTML = `<div class="meta-label">${this.label1}</div><div class="meta-title">${title1}</div>`;
-            this.elements.meta1.innerHTML = `<div class="meta-label">${this.label2}</div><div class="meta-title">${title2}</div>`;
+            meta0Label = this.label1;
+            meta0Title = title1;
+            meta1Label = this.label2;
+            meta1Title = title2;
+            this.elements.prevCard0.classList.add('was-target');
         } else {
-            // img2 is on left (index 0), img1 is on right (index 1)
-            this.elements.meta0.innerHTML = `<div class="meta-label">${this.label2}</div><div class="meta-title">${title2}</div>`;
-            this.elements.meta1.innerHTML = `<div class="meta-label">${this.label1}</div><div class="meta-title">${title1}</div>`;
+            meta0Label = this.label2;
+            meta0Title = title2;
+            meta1Label = this.label1;
+            meta1Title = title1;
+            this.elements.prevCard1.classList.add('was-target');
         }
 
-        this.elements.meta0.classList.remove('hidden');
-        this.elements.meta1.classList.remove('hidden');
+        // Mark clicked card as correct or incorrect
+        if (clickedIndex === 0) {
+            this.elements.prevCard0.classList.add(isCorrect ? 'correct' : 'incorrect');
+        } else {
+            this.elements.prevCard1.classList.add(isCorrect ? 'correct' : 'incorrect');
+        }
+
+        // Set metadata with result indicator
+        const resultText = isCorrect ? '✓ Correct' : '✗ Wrong';
+        const resultClass = isCorrect ? 'correct' : 'incorrect';
+
+        this.elements.prevMeta0.innerHTML = `
+            <div class="meta-label">${meta0Label}</div>
+            <div class="meta-title">${meta0Title}</div>
+            ${clickedIndex === 0 ? `<div class="meta-result ${resultClass}">${resultText}</div>` : ''}
+        `;
+        this.elements.prevMeta1.innerHTML = `
+            <div class="meta-label">${meta1Label}</div>
+            <div class="meta-title">${meta1Title}</div>
+            ${clickedIndex === 1 ? `<div class="meta-result ${resultClass}">${resultText}</div>` : ''}
+        `;
+
+        this.elements.previousRound.classList.remove('hidden');
     },
 
     // Format Wikimedia title for display
@@ -327,20 +353,6 @@ const Game = {
             .replace(/\.[^.]+$/, '')
             .replace(/_/g, ' ')
             .substring(0, 50) + (title.length > 50 ? '...' : '');
-    },
-
-    // Show full-screen overlay
-    showOverlay(isCorrect, message) {
-        this.elements.overlay.className = `overlay ${isCorrect ? 'correct' : 'incorrect'}`;
-        this.elements.overlayIcon.textContent = isCorrect ? '✓' : '✗';
-        this.elements.overlayText.textContent = message;
-        this.elements.overlayDetails.innerHTML = '';
-        this.elements.overlay.classList.remove('hidden');
-    },
-
-    // Hide overlay
-    hideOverlay() {
-        this.elements.overlay.classList.add('hidden');
     },
 
     // End the game
