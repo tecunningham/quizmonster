@@ -140,9 +140,33 @@ body {
     color: #fff;
 }
 
+.btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: #ccc;
+    border: 2px solid #444;
+}
+
+.btn-secondary:hover {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+}
+
 .btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 20px rgba(243, 156, 18, 0.3);
+}
+
+.btn-secondary:hover {
+    box-shadow: 0 5px 20px rgba(255, 255, 255, 0.1);
+}
+
+.result-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.result-buttons .btn {
+    flex: 1;
 }
 
 .btn:active {
@@ -167,6 +191,11 @@ body {
 
 .question strong {
     color: #f39c12;
+}
+
+.question-hint {
+    font-size: 0.9rem;
+    color: #888;
 }
 
 .images-container {

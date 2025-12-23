@@ -23,6 +23,38 @@ const Game = {
         this.cacheElements();
         this.populatePresets();
         this.bindEvents();
+        this.checkUrlParams();
+    },
+
+    // Check URL parameters and auto-start if present
+    checkUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const preset = params.get('preset');
+        const cat1 = params.get('cat1');
+        const cat2 = params.get('cat2');
+
+        if (preset !== null) {
+            const presetIndex = parseInt(preset);
+            const presetData = Categories.getPreset(presetIndex);
+            if (presetData) {
+                this.startWithPreset(presetIndex);
+            }
+        } else if (cat1 && cat2) {
+            this.category1 = cat1;
+            this.category2 = cat2;
+            this.label1 = cat1;
+            this.label2 = cat2;
+            this.loadAndStartGame();
+        }
+    },
+
+    // Generate shareable URL for current game
+    getShareUrl() {
+        const base = window.location.origin + window.location.pathname;
+        if (this.category1 && this.category2) {
+            return `${base}?cat1=${encodeURIComponent(this.category1)}&cat2=${encodeURIComponent(this.category2)}`;
+        }
+        return base;
     },
 
     // Cache DOM elements
@@ -37,10 +69,12 @@ const Game = {
             category2Input: document.getElementById('category2'),
             startBtn: document.getElementById('start-btn'),
             playAgainBtn: document.getElementById('play-again-btn'),
+            shareBtn: document.getElementById('share-btn'),
             restartBtn: document.getElementById('restart-btn'),
             roundCounter: document.getElementById('round-counter'),
             scoreDisplay: document.getElementById('score-display'),
             targetLabel: document.getElementById('target-label'),
+            otherLabel: document.getElementById('other-label'),
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
             meta0: document.getElementById('meta-0'),
@@ -72,11 +106,27 @@ const Game = {
     bindEvents() {
         this.elements.startBtn.addEventListener('click', () => this.startGame());
         this.elements.playAgainBtn.addEventListener('click', () => this.resetGame());
+        this.elements.shareBtn.addEventListener('click', () => this.shareQuiz());
         this.elements.restartBtn.addEventListener('click', () => this.resetGame());
 
         this.elements.imageCards.forEach(card => {
             card.addEventListener('click', (e) => this.handleImageClick(e));
         });
+    },
+
+    // Copy share link to clipboard
+    async shareQuiz() {
+        const url = this.getShareUrl();
+        try {
+            await navigator.clipboard.writeText(url);
+            this.elements.shareBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                this.elements.shareBtn.textContent = 'Copy Link';
+            }, 2000);
+        } catch (err) {
+            // Fallback for older browsers
+            prompt('Copy this link:', url);
+        }
     },
 
     // Start game with a preset
@@ -195,6 +245,7 @@ const Game = {
 
         // Set the question (always ask for category 1)
         this.elements.targetLabel.textContent = this.label1;
+        this.elements.otherLabel.textContent = this.label2;
     },
 
     // Set image with loading state

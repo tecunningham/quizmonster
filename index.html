@@ -34,7 +34,7 @@
                 <span id="score-display">Score: 0</span>
             </div>
 
-            <p class="question">Click on the <strong id="target-label"></strong></p>
+            <p class="question">Click on the <strong id="target-label"></strong><br><span class="question-hint">(not the <span id="other-label"></span>)</span></p>
 
             <div class="images-container">
                 <div class="image-card" data-index="0">
@@ -74,7 +74,10 @@
                 <span id="final-score-value">0</span> / 5
             </div>
             <p id="result-message"></p>
-            <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+            <div class="result-buttons">
+                <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+                <button id="share-btn" class="btn btn-secondary">Copy Link</button>
+            </div>
         </div>
     </div>
 
