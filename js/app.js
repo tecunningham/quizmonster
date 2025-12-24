@@ -65,13 +65,10 @@ const Game = {
             startScreen: document.getElementById('start-screen'),
             gameScreen: document.getElementById('game-screen'),
             loadingScreen: document.getElementById('loading-screen'),
-            resultScreen: document.getElementById('result-screen'),
             presetButtons: document.getElementById('preset-buttons'),
             category1Input: document.getElementById('category1'),
             category2Input: document.getElementById('category2'),
             startBtn: document.getElementById('start-btn'),
-            playAgainBtn: document.getElementById('play-again-btn'),
-            shareBtn: document.getElementById('share-btn'),
             roundCounter: document.getElementById('round-counter'),
             scoreDisplay: document.getElementById('score-display'),
             targetLabel: document.getElementById('target-label'),
@@ -79,9 +76,7 @@ const Game = {
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
             imageCards: document.querySelectorAll('.image-card'),
-            history: document.getElementById('history'),
-            finalScoreValue: document.getElementById('final-score-value'),
-            resultMessage: document.getElementById('result-message')
+            history: document.getElementById('history')
         };
     },
 
@@ -101,8 +96,6 @@ const Game = {
     // Bind event listeners
     bindEvents() {
         this.elements.startBtn.addEventListener('click', () => this.startGame());
-        this.elements.playAgainBtn.addEventListener('click', () => this.resetGame());
-        this.elements.shareBtn.addEventListener('click', () => this.shareQuiz());
 
         this.elements.imageCards.forEach(card => {
             card.addEventListener('click', (e) => this.handleImageClick(e));
@@ -112,12 +105,15 @@ const Game = {
     // Copy share link to clipboard
     async shareQuiz() {
         const url = this.getShareUrl();
+        const btn = document.querySelector('.result-card .btn-secondary') || this.elements.shareBtn;
         try {
             await navigator.clipboard.writeText(url);
-            this.elements.shareBtn.textContent = 'Copied!';
-            setTimeout(() => {
-                this.elements.shareBtn.textContent = 'Copy Link';
-            }, 2000);
+            if (btn) {
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy Link';
+                }, 2000);
+            }
         } catch (err) {
             // Fallback for older browsers
             prompt('Copy this link:', url);
@@ -138,7 +134,7 @@ const Game = {
 
     // Show a specific screen
     showScreen(screenName) {
-        ['startScreen', 'gameScreen', 'loadingScreen', 'resultScreen'].forEach(name => {
+        ['startScreen', 'gameScreen', 'loadingScreen'].forEach(name => {
             this.elements[name].classList.add('hidden');
         });
         this.elements[screenName].classList.remove('hidden');
@@ -377,10 +373,8 @@ const Game = {
             .substring(0, 50) + (title.length > 50 ? '...' : '');
     },
 
-    // End the game
+    // End the game - add result card to history
     endGame() {
-        this.elements.finalScoreValue.textContent = this.score;
-
         // Set result message
         const percentage = (this.score / this.totalRounds) * 100;
         let message = '';
@@ -395,13 +389,34 @@ const Game = {
         } else {
             message = 'Better luck next time!';
         }
-        this.elements.resultMessage.textContent = message;
 
-        this.showScreen('resultScreen');
+        // Hide current round UI
+        this.elements.roundCounter.parentElement.classList.add('hidden');
+        document.querySelector('.question').classList.add('hidden');
+        document.querySelector('.images-container').classList.add('hidden');
+
+        // Add result card to top of history
+        const resultHtml = `
+            <div class="result-card">
+                <h2>Quiz Complete!</h2>
+                <div class="final-score">${this.score} / ${this.totalRounds}</div>
+                <p class="result-message">${message}</p>
+                <div class="result-buttons">
+                    <button class="btn btn-primary" onclick="Game.resetGame()">Play Again</button>
+                    <button class="btn btn-secondary" onclick="Game.shareQuiz()">Copy Link</button>
+                </div>
+            </div>
+        `;
+        this.elements.history.insertAdjacentHTML('afterbegin', resultHtml);
     },
 
     // Reset to start screen
     resetGame() {
+        // Restore hidden game UI elements
+        this.elements.roundCounter.parentElement.classList.remove('hidden');
+        document.querySelector('.question').classList.remove('hidden');
+        document.querySelector('.images-container').classList.remove('hidden');
+
         this.showScreen('startScreen');
     }
 };
