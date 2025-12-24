@@ -79,13 +79,7 @@ const Game = {
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
             imageCards: document.querySelectorAll('.image-card'),
-            previousRound: document.getElementById('previous-round'),
-            prevImage0: document.getElementById('prev-image-0'),
-            prevImage1: document.getElementById('prev-image-1'),
-            prevCard0: document.getElementById('prev-card-0'),
-            prevCard1: document.getElementById('prev-card-1'),
-            prevMeta0: document.getElementById('prev-meta-0'),
-            prevMeta1: document.getElementById('prev-meta-1'),
+            history: document.getElementById('history'),
             finalScoreValue: document.getElementById('final-score-value'),
             resultMessage: document.getElementById('result-message')
         };
@@ -229,9 +223,9 @@ const Game = {
             card.classList.remove('correct', 'incorrect', 'disabled');
         });
 
-        // Hide previous round on first round
+        // Clear history on first round
         if (this.currentRound === 1) {
-            this.elements.previousRound.classList.add('hidden');
+            this.elements.history.innerHTML = '';
         }
 
         // Get images and store them
@@ -279,8 +273,8 @@ const Game = {
             this.score++;
         }
 
-        // Show the previous round result
-        this.showPreviousRound(clickedIndex, isCorrect);
+        // Add to history
+        this.addToHistory(clickedIndex, isCorrect);
 
         // Immediately go to next round or end game
         if (this.currentRound >= this.totalRounds) {
@@ -290,58 +284,87 @@ const Game = {
         }
     },
 
-    // Show previous round results below current images
-    showPreviousRound(clickedIndex, isCorrect) {
+    // Add round results to history
+    addToHistory(clickedIndex, isCorrect) {
         const title1 = this.formatImageTitle(this.currentImg1?.title);
         const title2 = this.formatImageTitle(this.currentImg2?.title);
 
-        // Set images
-        this.elements.prevImage0.src = this.elements.image0.src;
-        this.elements.prevImage1.src = this.elements.image1.src;
+        // Get Wikimedia Commons page URLs
+        const wikiUrl1 = this.currentImg1?.title
+            ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(this.currentImg1.title)}`
+            : '#';
+        const wikiUrl2 = this.currentImg2?.title
+            ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(this.currentImg2.title)}`
+            : '#';
 
-        // Reset classes
-        this.elements.prevCard0.className = 'previous-card';
-        this.elements.prevCard1.className = 'previous-card';
+        // Determine which image is in which position
+        let img0Url, img1Url, meta0Label, meta0Title, meta1Label, meta1Title, link0, link1;
+        let card0IsCorrect, card1IsCorrect;
 
-        // Determine which image is in which position and set metadata
-        let meta0Label, meta0Title, meta1Label, meta1Title;
         if (this.correctIndex === 0) {
+            // Category1 (target) is on the left
+            img0Url = this.elements.image0.src;
+            img1Url = this.elements.image1.src;
             meta0Label = this.label1;
             meta0Title = title1;
             meta1Label = this.label2;
             meta1Title = title2;
-            this.elements.prevCard0.classList.add('was-target');
+            link0 = wikiUrl1;
+            link1 = wikiUrl2;
+            card0IsCorrect = true;
+            card1IsCorrect = false;
         } else {
+            // Category1 (target) is on the right
+            img0Url = this.elements.image0.src;
+            img1Url = this.elements.image1.src;
             meta0Label = this.label2;
             meta0Title = title2;
             meta1Label = this.label1;
             meta1Title = title1;
-            this.elements.prevCard1.classList.add('was-target');
+            link0 = wikiUrl2;
+            link1 = wikiUrl1;
+            card0IsCorrect = false;
+            card1IsCorrect = true;
         }
 
-        // Mark clicked card as correct or incorrect
-        if (clickedIndex === 0) {
-            this.elements.prevCard0.classList.add(isCorrect ? 'correct' : 'incorrect');
-        } else {
-            this.elements.prevCard1.classList.add(isCorrect ? 'correct' : 'incorrect');
-        }
+        // Build classes for each card
+        const card0Classes = ['history-card'];
+        const card1Classes = ['history-card'];
 
-        // Set metadata with result indicator
-        const resultText = isCorrect ? '✓ Correct' : '✗ Wrong';
-        const resultClass = isCorrect ? 'correct' : 'incorrect';
+        card0Classes.push(card0IsCorrect ? 'correct' : 'wrong');
+        card1Classes.push(card1IsCorrect ? 'correct' : 'wrong');
 
-        this.elements.prevMeta0.innerHTML = `
-            <div class="meta-label">${meta0Label}</div>
-            <div class="meta-title">${meta0Title}</div>
-            ${clickedIndex === 0 ? `<div class="meta-result ${resultClass}">${resultText}</div>` : ''}
+        if (clickedIndex === 0) card0Classes.push('chosen');
+        if (clickedIndex === 1) card1Classes.push('chosen');
+
+        // Create history round HTML
+        const roundHtml = `
+            <div class="history-round">
+                <div class="history-images">
+                    <div class="${card0Classes.join(' ')}">
+                        <a href="${link0}" target="_blank" rel="noopener">
+                            <img src="${img0Url}" alt="${meta0Label}">
+                        </a>
+                        <div class="history-meta">
+                            <div class="meta-label">${meta0Label}</div>
+                            <div class="meta-title">${meta0Title}</div>
+                        </div>
+                    </div>
+                    <div class="${card1Classes.join(' ')}">
+                        <a href="${link1}" target="_blank" rel="noopener">
+                            <img src="${img1Url}" alt="${meta1Label}">
+                        </a>
+                        <div class="history-meta">
+                            <div class="meta-label">${meta1Label}</div>
+                            <div class="meta-title">${meta1Title}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
-        this.elements.prevMeta1.innerHTML = `
-            <div class="meta-label">${meta1Label}</div>
-            <div class="meta-title">${meta1Title}</div>
-            ${clickedIndex === 1 ? `<div class="meta-result ${resultClass}">${resultText}</div>` : ''}
-        `;
 
-        this.elements.previousRound.classList.remove('hidden');
+        // Prepend to history (newest at top)
+        this.elements.history.insertAdjacentHTML('afterbegin', roundHtml);
     },
 
     // Format Wikimedia title for display
