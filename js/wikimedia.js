@@ -65,12 +65,18 @@ const Wikimedia = {
     },
 
     // Get validated images for a query
-    async getValidatedImages(query, count = 5) {
+    async getValidatedImages(query, count = 5, onProgress = null) {
         // Check cache first
         const cacheKey = query.toLowerCase();
         if (this.imageCache.has(cacheKey)) {
             const cached = this.imageCache.get(cacheKey);
             if (cached.length >= count) {
+                // Report all as found immediately from cache
+                if (onProgress) {
+                    for (let i = 0; i < count; i++) {
+                        onProgress();
+                    }
+                }
                 // Return shuffled subset
                 return this.shuffleArray([...cached]).slice(0, count);
             }
@@ -81,11 +87,14 @@ const Wikimedia = {
         const validated = [];
 
         for (const img of candidates) {
-            if (validated.length >= count * 2) break; // Cache extras
+            if (validated.length >= count) break; // Stop once we have enough
 
             const isValid = await this.validateImage(img.url);
             if (isValid) {
                 validated.push(img);
+                if (onProgress) {
+                    onProgress();
+                }
             }
         }
 

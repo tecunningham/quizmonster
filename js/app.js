@@ -76,7 +76,9 @@ const Game = {
             image0: document.getElementById('image-0'),
             image1: document.getElementById('image-1'),
             imageCards: document.querySelectorAll('.image-card'),
-            history: document.getElementById('history')
+            history: document.getElementById('history'),
+            progressBar: document.getElementById('progress-bar'),
+            progressDots: document.getElementById('progress-dots')
         };
     },
 
@@ -158,6 +160,36 @@ const Game = {
         this.loadAndStartGame();
     },
 
+    // Initialize progress display
+    initProgress(total) {
+        this.progressFound = 0;
+        this.progressTotal = total;
+
+        // Reset progress bar
+        this.elements.progressBar.style.width = '0%';
+
+        // Create dots
+        this.elements.progressDots.innerHTML = '';
+        for (let i = 0; i < total; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'progress-dot';
+            this.elements.progressDots.appendChild(dot);
+        }
+    },
+
+    // Update progress display
+    updateProgress() {
+        this.progressFound++;
+        const percent = (this.progressFound / this.progressTotal) * 100;
+        this.elements.progressBar.style.width = `${percent}%`;
+
+        // Light up the next dot
+        const dots = this.elements.progressDots.querySelectorAll('.progress-dot');
+        if (dots[this.progressFound - 1]) {
+            dots[this.progressFound - 1].classList.add('found');
+        }
+    },
+
     // Load images and start the game
     async loadAndStartGame() {
         // Reset state
@@ -168,11 +200,18 @@ const Game = {
         // Show loading screen
         this.showScreen('loadingScreen');
 
+        // Calculate total images needed (for both categories)
+        const imagesPerCategory = this.totalRounds + 2;
+        const totalImages = imagesPerCategory * 2;
+        this.initProgress(totalImages);
+
         // Pre-fetch images for all rounds
         try {
+            const onProgress = () => this.updateProgress();
+
             const [images1, images2] = await Promise.all([
-                Wikimedia.getValidatedImages(this.category1, this.totalRounds + 2),
-                Wikimedia.getValidatedImages(this.category2, this.totalRounds + 2)
+                Wikimedia.getValidatedImages(this.category1, imagesPerCategory, onProgress),
+                Wikimedia.getValidatedImages(this.category2, imagesPerCategory, onProgress)
             ]);
 
             if (images1.length < this.totalRounds || images2.length < this.totalRounds) {
