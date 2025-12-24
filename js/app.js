@@ -327,38 +327,37 @@ const Game = {
             card1IsCorrect = true;
         }
 
-        // Build classes for each card
+        // Build classes for each card - only chosen card gets correct/wrong class
         const card0Classes = ['history-card'];
         const card1Classes = ['history-card'];
 
-        card0Classes.push(card0IsCorrect ? 'correct' : 'wrong');
-        card1Classes.push(card1IsCorrect ? 'correct' : 'wrong');
+        if (clickedIndex === 0) {
+            card0Classes.push('chosen');
+            card0Classes.push(isCorrect ? 'correct' : 'wrong');
+        }
+        if (clickedIndex === 1) {
+            card1Classes.push('chosen');
+            card1Classes.push(isCorrect ? 'correct' : 'wrong');
+        }
 
-        if (clickedIndex === 0) card0Classes.push('chosen');
-        if (clickedIndex === 1) card1Classes.push('chosen');
-
-        // Create history round HTML
+        // Create history round HTML - whole card is clickable
         const roundHtml = `
             <div class="history-round">
                 <div class="history-images">
-                    <div class="${card0Classes.join(' ')}">
-                        <a href="${link0}" target="_blank" rel="noopener">
-                            <img src="${img0Url}" alt="${meta0Label}">
-                        </a>
+                    <a href="${link0}" target="_blank" rel="noopener" class="${card0Classes.join(' ')}">
+                        <img src="${img0Url}" alt="${meta0Label}">
                         <div class="history-meta">
                             <div class="meta-label">${meta0Label}</div>
                             <div class="meta-title">${meta0Title}</div>
                         </div>
-                    </div>
-                    <div class="${card1Classes.join(' ')}">
-                        <a href="${link1}" target="_blank" rel="noopener">
-                            <img src="${img1Url}" alt="${meta1Label}">
-                        </a>
+                    </a>
+                    <a href="${link1}" target="_blank" rel="noopener" class="${card1Classes.join(' ')}">
+                        <img src="${img1Url}" alt="${meta1Label}">
                         <div class="history-meta">
                             <div class="meta-label">${meta1Label}</div>
                             <div class="meta-title">${meta1Title}</div>
                         </div>
-                    </div>
+                    </a>
                 </div>
             </div>
         `;
