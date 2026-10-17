@@ -1,464 +1,58 @@
-// QuizMonster Game Logic
+'use strict';
 const Game = {
-    // State
-    currentRound: 0,
-    totalRounds: 5,
-    score: 0,
-    category1: '',
-    category2: '',
-    label1: '',
-    label2: '',
-    correctIndex: 0,
-    imagesForCategory1: [],
-    imagesForCategory2: [],
-    usedImages: new Set(),
-    currentImg1: null,  // Current round's category1 image
-    currentImg2: null,  // Current round's category2 image
-    currentPresetSlug: null,  // Track if using a preset for share URL
-
-    // DOM Elements
-    elements: {},
-
-    // Initialize the game
-    init() {
-        this.cacheElements();
-        this.populatePresets();
-        this.bindEvents();
-        this.checkUrlParams();
-    },
-
-    // Check URL parameters and auto-start if present
-    checkUrlParams() {
-        const params = new URLSearchParams(window.location.search);
-        const preset = params.get('preset');
-        const cat1 = params.get('cat1');
-        const cat2 = params.get('cat2');
-
-        if (preset) {
-            const presetData = Categories.getPreset(preset);
-            if (presetData) {
-                this.startWithPreset(preset);
-            }
-        } else if (cat1 && cat2) {
-            this.category1 = cat1;
-            this.category2 = cat2;
-            this.label1 = cat1;
-            this.label2 = cat2;
-            this.loadAndStartGame();
-        }
-    },
-
-    // Generate shareable URL for current game
-    getShareUrl() {
-        const base = window.location.origin + window.location.pathname;
-        if (this.currentPresetSlug) {
-            return `${base}?preset=${this.currentPresetSlug}`;
-        } else if (this.category1 && this.category2) {
-            return `${base}?cat1=${encodeURIComponent(this.category1)}&cat2=${encodeURIComponent(this.category2)}`;
-        }
-        return base;
-    },
-
-    // Cache DOM elements
-    cacheElements() {
-        this.elements = {
-            startScreen: document.getElementById('start-screen'),
-            gameScreen: document.getElementById('game-screen'),
-            loadingScreen: document.getElementById('loading-screen'),
-            presetButtons: document.getElementById('preset-buttons'),
-            category1Input: document.getElementById('category1'),
-            category2Input: document.getElementById('category2'),
-            startBtn: document.getElementById('start-btn'),
-            roundCounter: document.getElementById('round-counter'),
-            scoreDisplay: document.getElementById('score-display'),
-            targetLabel: document.getElementById('target-label'),
-            otherLabel: document.getElementById('other-label'),
-            image0: document.getElementById('image-0'),
-            image1: document.getElementById('image-1'),
-            imageCards: document.querySelectorAll('.image-card'),
-            history: document.getElementById('history'),
-            progressBar: document.getElementById('progress-bar'),
-            progressDots: document.getElementById('progress-dots')
-        };
-    },
-
-    // Populate preset buttons
-    populatePresets() {
-        const presets = Categories.getPresetNames();
-        presets.forEach(preset => {
-            const btn = document.createElement('button');
-            btn.className = 'preset-btn';
-            btn.dataset.slug = preset.slug;
-            btn.textContent = preset.name;
-            btn.addEventListener('click', () => this.startWithPreset(preset.slug));
-            this.elements.presetButtons.appendChild(btn);
-        });
-    },
-
-    // Bind event listeners
-    bindEvents() {
-        this.elements.startBtn.addEventListener('click', () => this.startGame());
-
-        this.elements.imageCards.forEach(card => {
-            card.addEventListener('click', (e) => this.handleImageClick(e));
-        });
-    },
-
-    // Copy share link to clipboard
-    async shareQuiz() {
-        const url = this.getShareUrl();
-        const btn = document.querySelector('.result-card .btn-secondary') || this.elements.shareBtn;
-        try {
-            await navigator.clipboard.writeText(url);
-            if (btn) {
-                btn.textContent = 'Copied!';
-                setTimeout(() => {
-                    btn.textContent = 'Copy Link';
-                }, 2000);
-            }
-        } catch (err) {
-            // Fallback for older browsers
-            prompt('Copy this link:', url);
-        }
-    },
-
-    // Start game with a preset (by slug)
-    startWithPreset(slug) {
-        const preset = Categories.getPreset(slug);
-        if (!preset) return;
-        this.currentPresetSlug = slug;
-        this.category1 = preset.category1;
-        this.category2 = preset.category2;
-        this.label1 = Categories.formatLabel(preset.category1);
-        this.label2 = Categories.formatLabel(preset.category2);
-        this.loadAndStartGame();
-    },
-
-    // Show a specific screen
-    showScreen(screenName) {
-        ['startScreen', 'gameScreen', 'loadingScreen'].forEach(name => {
-            this.elements[name].classList.add('hidden');
-        });
-        this.elements[screenName].classList.remove('hidden');
-    },
-
-    // Start game with custom categories
-    startGame() {
-        const customCat1 = this.elements.category1Input.value.trim();
-        const customCat2 = this.elements.category2Input.value.trim();
-
-        if (!customCat1 || !customCat2) {
-            alert('Please enter both categories.');
-            return;
-        }
-
-        this.currentPresetSlug = null;  // Custom game, not a preset
-        this.category1 = customCat1;
-        this.category2 = customCat2;
-        this.label1 = customCat1;
-        this.label2 = customCat2;
-        this.loadAndStartGame();
-    },
-
-    // Initialize progress display
-    initProgress(total) {
-        this.progressFound = 0;
-        this.progressTotal = total;
-
-        // Reset progress bar
-        this.elements.progressBar.style.width = '0%';
-
-        // Create dots
-        this.elements.progressDots.innerHTML = '';
-        for (let i = 0; i < total; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'progress-dot';
-            this.elements.progressDots.appendChild(dot);
-        }
-    },
-
-    // Update progress display
-    updateProgress() {
-        this.progressFound++;
-        const percent = (this.progressFound / this.progressTotal) * 100;
-        this.elements.progressBar.style.width = `${percent}%`;
-
-        // Light up the next dot
-        const dots = this.elements.progressDots.querySelectorAll('.progress-dot');
-        if (dots[this.progressFound - 1]) {
-            dots[this.progressFound - 1].classList.add('found');
-        }
-    },
-
-    // Load images and start the game
-    async loadAndStartGame() {
-        // Reset state
-        this.currentRound = 0;
-        this.score = 0;
-        this.usedImages.clear();
-
-        // Show loading screen
-        this.showScreen('loadingScreen');
-
-        // Calculate total images needed (for both categories)
-        const imagesPerCategory = this.totalRounds + 2;
-        const totalImages = imagesPerCategory * 2;
-        this.initProgress(totalImages);
-
-        // Pre-fetch images for all rounds
-        try {
-            const onProgress = () => this.updateProgress();
-
-            const [images1, images2] = await Promise.all([
-                Wikimedia.getValidatedImages(this.category1, imagesPerCategory, onProgress),
-                Wikimedia.getValidatedImages(this.category2, imagesPerCategory, onProgress)
-            ]);
-
-            if (images1.length < this.totalRounds || images2.length < this.totalRounds) {
-                alert('Could not find enough images for these categories. Try different search terms.');
-                this.showScreen('startScreen');
-                return;
-            }
-
-            this.imagesForCategory1 = images1;
-            this.imagesForCategory2 = images2;
-
-            // Start first round
-            this.showScreen('gameScreen');
-            this.nextRound();
-        } catch (error) {
-            console.error('Error loading images:', error);
-            alert('Error loading images. Please try again.');
-            this.showScreen('startScreen');
-        }
-    },
-
-    // Get an unused image from a category
-    getUnusedImage(images) {
-        for (const img of images) {
-            if (!this.usedImages.has(img.url)) {
-                this.usedImages.add(img.url);
-                return img;
-            }
-        }
-        // If all used, return random one
-        return images[Math.floor(Math.random() * images.length)];
-    },
-
-    // Set up next round
-    nextRound() {
-        this.currentRound++;
-
-        // Update UI
-        this.elements.roundCounter.textContent = `Round ${this.currentRound} of ${this.totalRounds}`;
-        this.elements.scoreDisplay.textContent = `Score: ${this.score}`;
-
-        // Reset image cards
-        this.elements.imageCards.forEach(card => {
-            card.classList.remove('correct', 'incorrect', 'disabled');
-        });
-
-        // Clear history on first round
-        if (this.currentRound === 1) {
-            this.elements.history.innerHTML = '';
-        }
-
-        // Get images and store them
-        this.currentImg1 = this.getUnusedImage(this.imagesForCategory1);
-        this.currentImg2 = this.getUnusedImage(this.imagesForCategory2);
-
-        // Randomly decide which goes where (0 = left, 1 = right)
-        this.correctIndex = Math.random() < 0.5 ? 0 : 1;
-
-        // Set images (no labels shown - that would give away the answer!)
-        if (this.correctIndex === 0) {
-            this.setImage(0, this.currentImg1.url);
-            this.setImage(1, this.currentImg2.url);
-        } else {
-            this.setImage(0, this.currentImg2.url);
-            this.setImage(1, this.currentImg1.url);
-        }
-
-        // Set the question (always ask for category 1)
-        this.elements.targetLabel.textContent = this.label1;
-        this.elements.otherLabel.textContent = this.label2;
-    },
-
-    // Set image with loading state
-    setImage(index, url) {
-        const img = this.elements[`image${index}`];
-        img.classList.add('loading');
-        img.onload = () => img.classList.remove('loading');
-        img.onerror = () => {
-            img.classList.remove('loading');
-            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23333"/><text x="50%" y="50%" fill="%23666" text-anchor="middle">Image Error</text></svg>';
-        };
-        img.src = url;
-    },
-
-    // Handle image click
-    handleImageClick(e) {
-        const card = e.currentTarget;
-        const clickedIndex = parseInt(card.dataset.index);
-
-        // Check answer
-        const isCorrect = clickedIndex === this.correctIndex;
-
-        if (isCorrect) {
-            this.score++;
-        }
-
-        // Add to history
-        this.addToHistory(clickedIndex, isCorrect);
-
-        // Immediately go to next round or end game
-        if (this.currentRound >= this.totalRounds) {
-            this.endGame();
-        } else {
-            this.nextRound();
-        }
-    },
-
-    // Add round results to history
-    addToHistory(clickedIndex, isCorrect) {
-        const title1 = this.formatImageTitle(this.currentImg1?.title);
-        const title2 = this.formatImageTitle(this.currentImg2?.title);
-
-        // Get Wikimedia Commons page URLs
-        const wikiUrl1 = this.currentImg1?.title
-            ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(this.currentImg1.title)}`
-            : '#';
-        const wikiUrl2 = this.currentImg2?.title
-            ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(this.currentImg2.title)}`
-            : '#';
-
-        // Determine which image is in which position
-        let img0Url, img1Url, meta0Label, meta0Title, meta1Label, meta1Title, link0, link1;
-        let card0IsCorrect, card1IsCorrect;
-
-        if (this.correctIndex === 0) {
-            // Category1 (target) is on the left
-            img0Url = this.elements.image0.src;
-            img1Url = this.elements.image1.src;
-            meta0Label = this.label1;
-            meta0Title = title1;
-            meta1Label = this.label2;
-            meta1Title = title2;
-            link0 = wikiUrl1;
-            link1 = wikiUrl2;
-            card0IsCorrect = true;
-            card1IsCorrect = false;
-        } else {
-            // Category1 (target) is on the right
-            img0Url = this.elements.image0.src;
-            img1Url = this.elements.image1.src;
-            meta0Label = this.label2;
-            meta0Title = title2;
-            meta1Label = this.label1;
-            meta1Title = title1;
-            link0 = wikiUrl2;
-            link1 = wikiUrl1;
-            card0IsCorrect = false;
-            card1IsCorrect = true;
-        }
-
-        // Build classes for each card - only chosen card gets correct/wrong class
-        const card0Classes = ['history-card'];
-        const card1Classes = ['history-card'];
-
-        if (clickedIndex === 0) {
-            card0Classes.push('chosen');
-            card0Classes.push(isCorrect ? 'correct' : 'wrong');
-        }
-        if (clickedIndex === 1) {
-            card1Classes.push('chosen');
-            card1Classes.push(isCorrect ? 'correct' : 'wrong');
-        }
-
-        // Create history round HTML - whole card is clickable
-        const roundHtml = `
-            <div class="history-round">
-                <div class="history-images">
-                    <a href="${link0}" target="_blank" rel="noopener" class="${card0Classes.join(' ')}">
-                        <img src="${img0Url}" alt="${meta0Label}">
-                        <div class="history-meta">
-                            <div class="meta-label">${meta0Label}</div>
-                            <div class="meta-title">${meta0Title}</div>
-                        </div>
-                    </a>
-                    <a href="${link1}" target="_blank" rel="noopener" class="${card1Classes.join(' ')}">
-                        <img src="${img1Url}" alt="${meta1Label}">
-                        <div class="history-meta">
-                            <div class="meta-label">${meta1Label}</div>
-                            <div class="meta-title">${meta1Title}</div>
-                        </div>
-                    </a>
-                </div>
-            </div>
-        `;
-
-        // Prepend to history (newest at top)
-        this.elements.history.insertAdjacentHTML('afterbegin', roundHtml);
-    },
-
-    // Format Wikimedia title for display
-    formatImageTitle(title) {
-        if (!title) return 'Unknown';
-        // Remove "File:" prefix and file extension
-        return title
-            .replace(/^File:/, '')
-            .replace(/\.[^.]+$/, '')
-            .replace(/_/g, ' ')
-            .substring(0, 50) + (title.length > 50 ? '...' : '');
-    },
-
-    // End the game - add result card to history
-    endGame() {
-        // Set result message
-        const percentage = (this.score / this.totalRounds) * 100;
-        let message = '';
-        if (percentage === 100) {
-            message = 'Perfect! You really know your stuff!';
-        } else if (percentage >= 80) {
-            message = 'Great job! Almost perfect!';
-        } else if (percentage >= 60) {
-            message = 'Good effort! Keep practicing!';
-        } else if (percentage >= 40) {
-            message = 'Not bad, but room for improvement!';
-        } else {
-            message = 'Better luck next time!';
-        }
-
-        // Hide current round UI
-        this.elements.roundCounter.parentElement.classList.add('hidden');
-        document.querySelector('.question').classList.add('hidden');
-        document.querySelector('.images-container').classList.add('hidden');
-
-        // Add result card to top of history
-        const resultHtml = `
-            <div class="result-card">
-                <h2>Quiz Complete!</h2>
-                <div class="final-score">${this.score} / ${this.totalRounds}</div>
-                <p class="result-message">${message}</p>
-                <div class="result-buttons">
-                    <button class="btn btn-primary" onclick="Game.resetGame()">Play Again</button>
-                    <button class="btn btn-secondary" onclick="Game.shareQuiz()">Copy Link</button>
-                </div>
-            </div>
-        `;
-        this.elements.history.insertAdjacentHTML('afterbegin', resultHtml);
-    },
-
-    // Reset to start screen
-    resetGame() {
-        // Restore hidden game UI elements
-        this.elements.roundCounter.parentElement.classList.remove('hidden');
-        document.querySelector('.question').classList.remove('hidden');
-        document.querySelector('.images-container').classList.remove('hidden');
-
-        this.showScreen('startScreen');
-    }
+  totalRounds:5,currentRound:0,score:0,token:0,locked:true,currentPresetSlug:null,rounds:[],pair:[],category1:null,category2:null,
+  init() {
+    this.startScreen=document.getElementById('start-screen');this.loadingScreen=document.getElementById('loading-screen');this.gameScreen=document.getElementById('game-screen');
+    this.status=document.getElementById('status');this.history=document.getElementById('history');this.credits=document.getElementById('round-credits');this.feedback=document.getElementById('round-feedback');this.next=document.getElementById('next-round');this.cards=[...document.querySelectorAll('.image-card')];
+    Categories.presets.forEach(p=>{const b=document.createElement('button');b.type='button';b.className='preset-btn';b.dataset.slug=p.slug;b.textContent=p.name;b.addEventListener('click',()=>this.startWithPreset(p.slug));document.getElementById('preset-buttons').append(b);});
+    Object.entries(Catalogue.categories).forEach(([id,cat])=>{const option=document.createElement('option');option.value=cat.label;document.getElementById('categories').append(option);});
+    document.getElementById('start-btn').addEventListener('click',()=>this.startGame());this.cards.forEach((card,index)=>card.addEventListener('click',()=>this.answer(index)));
+    this.next.addEventListener('click',()=>this.nextRound());document.getElementById('cancel-load').addEventListener('click',()=>this.resetGame());document.getElementById('back-start').addEventListener('click',()=>this.resetGame());document.getElementById('play-again').addEventListener('click',()=>this.resetGame());document.getElementById('copy-link').addEventListener('click',()=>this.shareQuiz());
+    const params=new URLSearchParams(location.search);if(params.get('preset')){const preset=Categories.getPreset(params.get('preset'));if(preset)this.startWithPreset(preset.slug);else this.message('That preset is unavailable. Choose one below.');}
+    else if(params.get('cat1')&&params.get('cat2'))this.start(Categories.resolve(params.get('cat1')),Categories.resolve(params.get('cat2')),null);
+  },
+  showScreen(name) { ['start','loading','game'].forEach(id=>document.getElementById(id+'-screen').classList.toggle('hidden',id!==name)); },
+  message(text){this.status.textContent=text;},
+  startWithPreset(slug){const p=Categories.getPreset(slug);if(p)this.start(p.category1,p.category2,slug);},
+  startGame(){this.start(Categories.resolve(document.getElementById('category1').value),Categories.resolve(document.getElementById('category2').value),null);},
+  async start(a,b,preset) {
+    if(!Categories.compatible(a,b)){this.showScreen('start');this.message('Choose two different listed categories from the same subject group: artists, art movements, ancient cultures, cathedral styles, fashion decades or elephant species.');return;}
+    const token=++this.token;this.locked=true;this.category1=a;this.category2=b;this.currentPresetSlug=preset;this.currentRound=0;this.score=0;this.history.replaceChildren();this.message('');document.getElementById('share-status').textContent='';document.getElementById('result').hidden=true;this.showScreen('loading');
+    const first=Wikimedia.shuffleArray(Wikimedia.forCategory(a));const second=Wikimedia.shuffleArray(Wikimedia.forCategory(b));
+    if(first.length<this.totalRounds||second.length<this.totalRounds){this.showScreen('start');this.message('This pair does not yet have enough checked images. Choose another pair.');return;}
+    const ids=new Set(first.map(i=>i.source));if(second.some(i=>ids.has(i.source))){this.showScreen('start');this.message('Those image sets overlap. Choose another pair so each answer is unambiguous.');return;}
+    this.rounds=Array.from({length:this.totalRounds},(_,i)=>[first[i],second[i]]);const images=this.rounds.flat();let loaded=0;
+    document.getElementById('progress-bar').style.width='0%';document.getElementById('loading-count').textContent=`0 / ${images.length} images`;
+    const available=await Promise.all(images.map(async image=>{const ok=await Wikimedia.validateImage(image.url);if(token===this.token){loaded++;document.getElementById('progress-bar').style.width=`${loaded/images.length*100}%`;document.getElementById('loading-count').textContent=`${loaded} / ${images.length} images`;}return ok;}));
+    if(token!==this.token)return;
+    if(available.some(ok=>!ok)){this.showScreen('start');this.message('Some images could not load. No answers were scored. Check your connection and try again, or choose another pair.');return;}
+    this.showScreen('game');document.getElementById('active-round').hidden=false;await this.nextRound();
+  },
+  async nextRound() {
+    if(this.currentRound>0 && this.next.hidden)return;
+    this.locked=true;this.cards.forEach(c=>{c.disabled=true;c.classList.remove('correct','incorrect');});this.next.hidden=true;this.feedback.textContent='';this.credits.replaceChildren();document.getElementById('credit-details').open=false;
+    if(this.currentRound>=this.totalRounds){this.finish();return;}
+    const [a,b]=this.rounds[this.currentRound];this.correctIndex=Math.random()<0.5?0:1;this.pair=this.correctIndex===0?[a,b]:[b,a];this.currentRound++;
+    document.getElementById('round-counter').textContent=`Round ${this.currentRound} of ${this.totalRounds}`;document.getElementById('score-display').textContent=`Score: ${this.score}`;
+    document.getElementById('target-label').textContent=Catalogue.categories[this.category1].label;document.getElementById('other-label').textContent=Catalogue.categories[this.category2].label;
+    this.pair.forEach((image,index)=>{const img=document.getElementById('image-'+index);img.alt=`Option ${index+1}`;img.src=image.url;const credit=document.createElement('section');const h=document.createElement('h3');h.textContent=`Option ${index+1}`;credit.append(h,Wikimedia.credit(image));this.credits.append(credit);});
+    const token=this.token;const ok=await Promise.all(this.pair.map(image=>Wikimedia.validateImage(image.url)));
+    if(token!==this.token)return;
+    if(ok.some(value=>!value)){this.showScreen('start');this.message('A round image became unavailable. The round was not scored. Please start again.');return;}
+    this.locked=false;this.cards.forEach(c=>c.disabled=false);document.getElementById('active-round').scrollIntoView({block:'start'});this.cards[0].focus({preventScroll:true});
+  },
+  answer(index) {
+    if(this.locked||!this.pair.length)return;this.locked=true;this.cards.forEach(c=>c.disabled=true);
+    const correct=index===this.correctIndex;if(correct)this.score++;
+    this.cards[this.correctIndex].classList.add('correct');if(!correct)this.cards[index].classList.add('incorrect');
+    this.feedback.textContent=correct?'Correct.':'Not quite — the green outline shows the correct image.';document.getElementById('score-display').textContent=`Score: ${this.score}`;document.getElementById('credit-details').open=true;
+    const row=document.createElement('article');row.className='history-round';const h=document.createElement('h3');h.textContent=`Round ${this.currentRound}: ${correct?'correct':'incorrect'}`;row.append(h);const grid=document.createElement('div');grid.className='history-images';
+    this.pair.forEach((image,i)=>{const card=document.createElement('div');card.className='history-card';if(i===index)card.classList.add('chosen',correct?'correct':'wrong');const img=document.createElement('img');img.src=image.url;img.alt=image.title;card.append(img,Wikimedia.credit(image));grid.append(card);});row.append(grid);this.history.prepend(row);
+    this.next.textContent=this.currentRound===this.totalRounds?'See results':'Next round';this.next.hidden=false;this.next.focus();
+  },
+  finish() { document.getElementById('active-round').hidden=true;const result=document.getElementById('result');result.hidden=false;document.getElementById('final-score').textContent=`${this.score} / ${this.totalRounds}`;result.focus(); },
+  resetGame(){++this.token;this.locked=true;this.pair=[];this.showScreen('start');this.message('');window.scrollTo({top:0});},
+  getShareUrl(){const base=location.origin+location.pathname;return this.currentPresetSlug?`${base}?preset=${encodeURIComponent(this.currentPresetSlug)}`:`${base}?cat1=${encodeURIComponent(this.category1)}&cat2=${encodeURIComponent(this.category2)}`;},
+  async shareQuiz(){try{await navigator.clipboard.writeText(this.getShareUrl());document.getElementById('share-status').textContent='Link copied.';}catch{const node=document.getElementById('share-status');node.replaceChildren();const a=document.createElement('a');a.href=this.getShareUrl();a.textContent='Open or copy this quiz link';node.append(a);}}
 };
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => Game.init());
+document.addEventListener('DOMContentLoaded',()=>Game.init());
